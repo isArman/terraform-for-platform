@@ -5,6 +5,8 @@ server_ip="$(terraform output -raw server_public_ip)"
 key="$HOME/.ssh/k3s-lab"
 kubeconfig="$HOME/.kube/k3s-hetzner.yaml"
 mkdir -p "$HOME/.kube"
+# Recycled Hetzner IPv4s keep the same address; drop the stale host key.
+ssh-keygen -R "$server_ip" >/dev/null 2>&1 || true
 
 for attempt in $(seq 1 60); do
   if ssh -i "$key" -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new \
