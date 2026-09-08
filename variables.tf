@@ -7,7 +7,7 @@ variable "location" {
 variable "server_type" {
   description = "Low-cost x86 instance type for all three K3s nodes"
   type        = string
-  default     = "cx22"
+  default     = "cx23"
 }
 
 variable "image" {

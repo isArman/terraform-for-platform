@@ -4,7 +4,8 @@ Disposable Kubernetes cluster for platform-engineering practice:
 
 - 1 K3s server/control-plane with a public IPv4
 - 2 private K3s workers (no public IP)
-- `cx22` in `fsn1` (Falkenstein)
+- `cx23` in `fsn1` (Falkenstein)
+- A Hetzner network route `0.0.0.0/0` via the server, plus NAT, so private workers can pull images
 - The server NATs workers so they can pull images without extra IPv4 addresses
 - SSH and Kubernetes API restricted to `operator_cidr`
 - HTTP/HTTPS open for ingress experiments

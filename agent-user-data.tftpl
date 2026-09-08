@@ -7,28 +7,39 @@ done
 
 priv_if="$(ip -o -4 addr show | awk '/${private_ip}\//{print $2; exit}')"
 
-ip route replace default via ${server_ip} dev "$priv_if"
-cat >/etc/resolv.conf <<'DNS'
-nameserver 185.12.64.1
-nameserver 185.12.64.2
-DNS
+cat >/usr/local/sbin/k3s-lab-default-route <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+ip route replace default via ${gateway}
+SCRIPT
+chmod 0755 /usr/local/sbin/k3s-lab-default-route
+/usr/local/sbin/k3s-lab-default-route
 
-cat >/etc/systemd/system/k3s-lab-default-route.service <<UNIT
+mkdir -p /etc/systemd/resolved.conf.d
+cat >/etc/systemd/resolved.conf.d/k3s-lab.conf <<'EOF'
+[Resolve]
+DNS=8.8.8.8 1.1.1.1
+FallbackDNS=185.12.64.1 185.12.64.2
+EOF
+resolvectl dns "$priv_if" 8.8.8.8 1.1.1.1 || true
+systemctl restart systemd-resolved || true
+
+cat >/etc/systemd/system/k3s-lab-default-route.service <<'UNIT'
 [Unit]
-Description=Default route via K3s server NAT
+Description=Default route via Hetzner network gateway (NAT on K3s server)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/sbin/ip route replace default via ${server_ip}
+ExecStart=/usr/local/sbin/k3s-lab-default-route
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable k3s-lab-default-route.service
+systemctl enable --now k3s-lab-default-route.service
 
 until curl -kfsS '${server_url}/ping' >/dev/null; do
   sleep 5

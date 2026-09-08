@@ -1,5 +1,5 @@
 location            = "fsn1"
-server_type         = "cx22"
+server_type         = "cx23"
 image               = "ubuntu-24.04"
 worker_count        = 2
 operator_cidr       = "172.86.66.91/32"

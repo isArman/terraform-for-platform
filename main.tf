@@ -111,6 +111,12 @@ resource "hcloud_server" "server" {
   depends_on = [hcloud_network_subnet.lab]
 }
 
+resource "hcloud_network_route" "default_via_server" {
+  network_id  = hcloud_network.lab.id
+  destination = "0.0.0.0/0"
+  gateway     = local.server_private_ip
+}
+
 resource "hcloud_server" "worker" {
   count = var.worker_count
 
@@ -120,11 +126,11 @@ resource "hcloud_server" "worker" {
   location    = var.location
   ssh_keys    = [hcloud_ssh_key.operator.id]
   user_data = templatefile("${path.module}/agent-user-data.tftpl", {
-    token        = random_password.k3s_token.result
-    node_name    = "k3s-worker-${count.index + 1}"
-    private_ip   = cidrhost(local.subnet_cidr, local.worker_ip_offset + count.index)
-    server_ip    = local.server_private_ip
-    server_url   = "https://${local.server_private_ip}:6443"
+    token      = random_password.k3s_token.result
+    node_name  = "k3s-worker-${count.index + 1}"
+    private_ip = cidrhost(local.subnet_cidr, local.worker_ip_offset + count.index)
+    gateway    = cidrhost(local.subnet_cidr, 1)
+    server_url = "https://${local.server_private_ip}:6443"
   })
 
   labels = {
@@ -142,5 +148,9 @@ resource "hcloud_server" "worker" {
     ip         = cidrhost(local.subnet_cidr, local.worker_ip_offset + count.index)
   }
 
-  depends_on = [hcloud_network_subnet.lab, hcloud_server.server]
+  depends_on = [
+    hcloud_network_subnet.lab,
+    hcloud_network_route.default_via_server,
+    hcloud_server.server,
+  ]
 }
