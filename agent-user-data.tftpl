@@ -1,0 +1,44 @@
+#!/bin/bash
+set -euxo pipefail
+
+until ip -o -4 addr show | grep -q ' ${private_ip}/'; do
+  sleep 2
+done
+
+priv_if="$(ip -o -4 addr show | awk '/${private_ip}\//{print $2; exit}')"
+
+ip route replace default via ${server_ip} dev "$priv_if"
+cat >/etc/resolv.conf <<'DNS'
+nameserver 185.12.64.1
+nameserver 185.12.64.2
+DNS
+
+cat >/etc/systemd/system/k3s-lab-default-route.service <<UNIT
+[Unit]
+Description=Default route via K3s server NAT
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip route replace default via ${server_ip}
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable k3s-lab-default-route.service
+
+until curl -kfsS '${server_url}/ping' >/dev/null; do
+  sleep 5
+done
+
+until curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh; do
+  sleep 5
+done
+chmod 0755 /tmp/install-k3s.sh
+K3S_URL='${server_url}' \
+K3S_TOKEN='${token}' \
+INSTALL_K3S_EXEC='agent --node-name ${node_name} --node-ip ${private_ip} --flannel-iface '"$priv_if" \
+  /tmp/install-k3s.sh

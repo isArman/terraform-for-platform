@@ -1,0 +1,48 @@
+#!/bin/bash
+set -euxo pipefail
+
+until ip -4 route show default | grep -q .; do
+  sleep 2
+done
+
+cat >/etc/sysctl.d/99-k3s-nat.conf <<SYSCTL
+net.ipv4.ip_forward=1
+SYSCTL
+
+cat >/usr/local/sbin/k3s-lab-nat <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+sysctl -w net.ipv4.ip_forward=1
+interface="$(ip route show default | awk '{print $5; exit}')"
+iptables -t nat -C POSTROUTING -o "$interface" -s ${network_cidr} -j MASQUERADE 2>/dev/null || \
+  iptables -t nat -A POSTROUTING -o "$interface" -s ${network_cidr} -j MASQUERADE
+SCRIPT
+chmod 0755 /usr/local/sbin/k3s-lab-nat
+
+cat >/etc/systemd/system/k3s-nat.service <<'UNIT'
+[Unit]
+Description=K3s lab NAT for private workers
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/k3s-lab-nat
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload
+systemctl enable --now k3s-nat.service
+
+priv_if="$(ip -o -4 addr show | awk '/${private_ip}\//{print $2; exit}')"
+public_ip="$(ip -4 addr show "$(ip route show default | awk '{print $5; exit}')" | awk '/inet / {print $2; exit}' | cut -d/ -f1)"
+
+until curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh; do
+  sleep 5
+done
+chmod 0755 /tmp/install-k3s.sh
+K3S_TOKEN='${token}' \
+INSTALL_K3S_EXEC="server --node-name ${node_name} --node-ip ${private_ip} --advertise-address ${private_ip} --flannel-iface $${priv_if} --write-kubeconfig-mode 0644 --tls-san $${public_ip}" \
+  /tmp/install-k3s.sh
