@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
 until ip -o -4 addr show | grep -q ' ${private_ip}/'; do
   sleep 2

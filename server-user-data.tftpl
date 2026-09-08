@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail
+set -euo pipefail
 
 until ip -4 route show default | grep -q .; do
   sleep 2
@@ -16,6 +16,8 @@ sysctl -w net.ipv4.ip_forward=1
 interface="$(ip route show default | awk '{print $5; exit}')"
 iptables -t nat -C POSTROUTING -o "$interface" -s ${network_cidr} -j MASQUERADE 2>/dev/null || \
   iptables -t nat -A POSTROUTING -o "$interface" -s ${network_cidr} -j MASQUERADE
+ip route replace ${gateway} dev enp7s0 2>/dev/null || true
+ip route replace ${network_cidr} via ${gateway} dev enp7s0 2>/dev/null || true
 SCRIPT
 chmod 0755 /usr/local/sbin/k3s-lab-nat
 
@@ -36,7 +38,36 @@ UNIT
 systemctl daemon-reload
 systemctl enable --now k3s-nat.service
 
+# Hetzner private NIC can come up after the public default route.
+cat >/etc/netplan/60-k3s-private.yaml <<'EOF'
+network:
+  version: 2
+  ethernets:
+    enp7s0:
+      dhcp4: true
+      dhcp4-overrides:
+        use-dns: false
+      routes:
+        - to: ${gateway}/32
+          scope: link
+        - to: ${network_cidr}
+          via: ${gateway}
+EOF
+netplan apply || true
+
+until ip -o -4 addr show | grep -q " ${private_ip}/"; do
+  ip link set enp7s0 up || true
+  sleep 2
+done
+
 priv_if="$(ip -o -4 addr show | awk '/${private_ip}\//{print $2; exit}')"
+if [ -z "$priv_if" ]; then
+  echo "private interface for ${private_ip} not found" >&2
+  ip -o -4 addr show >&2
+  exit 1
+fi
+ip route replace ${gateway} dev "$priv_if" || true
+ip route replace ${network_cidr} via ${gateway} dev "$priv_if" || true
 public_ip="$(ip -4 addr show "$(ip route show default | awk '{print $5; exit}')" | awk '/inet / {print $2; exit}' | cut -d/ -f1)"
 
 until curl -sfL https://get.k3s.io -o /tmp/install-k3s.sh; do

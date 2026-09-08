@@ -91,6 +91,7 @@ resource "hcloud_server" "server" {
     node_name    = "k3s-server"
     private_ip   = local.server_private_ip
     network_cidr = local.network_cidr
+    gateway      = cidrhost(local.subnet_cidr, 1)
   })
 
   labels = {
