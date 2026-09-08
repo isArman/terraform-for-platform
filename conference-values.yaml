@@ -1,6 +1,7 @@
 # Chapter 2 Conference app — Bitnami images moved off docker.io/bitnami.
 # See https://github.com/salaboy/platforms-on-k8s/issues/86
 # Chart v1.0.0 still references bitnami/* tags that 404; use bitnamilegacy.
+# Ingress class is patched to Traefik in bootstrap-cluster.sh (chart defaults to nginx).
 
 postgresql:
   image:

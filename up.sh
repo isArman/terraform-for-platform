@@ -17,4 +17,4 @@ chmod 644 "$HOME/.ssh/k3s-lab.pub"
 
 terraform init
 terraform apply
-./get-kubeconfig.sh
+./bootstrap-cluster.sh

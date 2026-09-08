@@ -28,9 +28,13 @@ export KUBECONFIG="$HOME/.kube/k3s-hetzner.yaml"
 kubectl get nodes -o wide
 ```
 
-Review the Terraform plan and type `yes`.
+Review the Terraform plan and type `yes`. `up.sh` waits for three Ready nodes and
+installs the Chapter 2 Conference app (Helm chart `v1.0.0` with
+`conference-values.yaml` Bitnami-legacy images, Ingress on Traefik).
 
-Optional ingress-nginx:
+Open `http://<server_public_ip>/` after it finishes.
+
+To reinstall the app on an already-running cluster:
 
 ```bash
 ./bootstrap-cluster.sh
